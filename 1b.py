@@ -17,6 +17,7 @@ number_dict = {
 sum = 0
 
 for line in data:
+    # Use a lookahead because the words can overlap (like 'oneight')
     matches = re.finditer(r'(?=(\d|one|two|three|four|five|six|seven|eight|nine))', line)
     digits = [match.group(1) for match in matches]
     first_num = digits[0]

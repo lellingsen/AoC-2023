@@ -2,88 +2,91 @@ from aoc import get_input
 import time
 
 input = get_input(5).splitlines()
-# input = [
-#     'seeds: 79 14 55 13',
-#     '',
-#     'seed-to-soil map:',
-#     '50 98 2',
-#     '52 50 48',
-#     '',
-#     'soil-to-fertilizer map:',
-#     '0 15 37',
-#     '37 52 2',
-#     '39 0 15',
-#     '',
-#     'fertilizer-to-water map:',
-#     '49 53 8',
-#     '0 11 42',
-#     '42 0 7',
-#     '57 7 4',
-#     '',
-#     'water-to-light map:',
-#     '88 18 7',
-#     '18 25 70',
-#     '',  
-#     'light-to-temperature map:',
-#     '45 77 23',
-#     '81 45 19',
-#     '68 64 13',
-#     '',
-#     'temperature-to-humidity map:',
-#     '0 69 1',
-#     '1 0 69',
-#     '',
-#     'humidity-to-location map:',
-#     '60 56 37',
-#     '56 93 4',
-# ]
 
 start_time = time.time()
 
-# how might we be able to speed this up?
-# probably have to start working on everything as a range
-# and then map the ranges all the way down
-# split them as needed when only partially covered
-# and then we'd have a final group of ranges and could get the minimum location
-# so that would look like....
-# get the range for each seed
-# loop over the mappings, creating sub-ranges for ones that don't fully overlap
-# do that all the way down until we get to locations
-# add those locations to an array (or even just the minimum one from the whole group)
-# continue for each seed range
+# Needed to speed up the original solution
+# Had to work on ranges instead of individual values
+# The hard part was when ranges had to split, and handling which parts of
+# the range had already been mapped
 
 seed_info = input[0].split(': ')[1].split(' ')
 
 conversion_map = []
+current_mappings = []
+
+# Order the mappings by source value so that
+# we can more easily know if we already handled the beginning/end
+# of a range later
 for line in input[2:]:
     if line == '':
         continue
     if line.endswith('map:'):
-        conversion_map.append([])
+        current_mappings = sorted(current_mappings, key=lambda x: x['source'])
+        if len(current_mappings) > 0:
+            conversion_map.append(current_mappings)
+        current_mappings = []
         continue
 
     line_contents = line.split(' ')
     dest_start = int(line_contents[0])
     source_start = int(line_contents[1])
     range_length = int(line_contents[2])
-    conversion_map[-1].append({
-        'dest_start': dest_start,
-        'source_start': source_start,
-        'range_length': range_length,
+    current_mappings.append({
+        'dest': dest_start,
+        'source': source_start,
+        'len': range_length,
     })
+
+current_mappings = sorted(current_mappings, key=lambda x: x['source'])
+conversion_map.append(current_mappings)
 
 min_location = None
 for i in range(0, len(seed_info), 2):
     range_start = int(seed_info[i])
     range_len = int(seed_info[i + 1])
-    for seed in range(range_start, range_start + range_len):
-        for category in conversion_map:
+    ranges = [{ 'start': range_start, 'len': range_len }]
+    for category in conversion_map:
+        new_ranges = []
+        for cur_range in ranges:
+            mappings_for_range = []
+            last_value_mapped = None
+            # mappings are ordered
+            first_mapping = True
             for mapping in category:
-                if seed >= mapping['source_start'] and seed <= mapping['source_start'] + mapping['range_length'] - 1:
-                    seed = mapping['dest_start'] + (seed - mapping['source_start'])
-                    break
-        if min_location == None or seed < min_location:
-            min_location = seed
+                # check for any overlap
+                range_end = cur_range['start'] + cur_range['len'] - 1
+                mapping_end = mapping['source'] + mapping['len'] - 1
+                if cur_range['start'] <= mapping_end and mapping['source'] <= range_end:
+                    offset = cur_range['start'] - mapping['source']
+                    # Add the mapped part of the range
+                    new_range_start = mapping['dest'] + max(offset, 0)
+                    new_range_end = min(range_end, mapping_end)
+                    new_range_len = new_range_end - max(cur_range['start'], mapping['source']) + 1
+                    mapped_range = { 'start': new_range_start, 'len': new_range_len }
+                    mappings_for_range.append(mapped_range)
+                    first_value_mapped = mapping['source'] + max(offset, 0) - 1
+                    last_value_mapped = max(first_value_mapped + new_range_len, last_value_mapped if last_value_mapped is not None else 0)
+                    # If we didn't cover the start of the range, need to add that in unmapped
+                    if first_mapping and offset < 0:
+                        beginning_of_range = { 'start': cur_range['start'], 'len': abs(offset) }
+                        mappings_for_range.append(beginning_of_range)
+                first_mapping = False
+            # did any mappings match? if not, add the whole range (unmapped)
+            if len(mappings_for_range) == 0:
+                mappings_for_range.append(cur_range)
+            # did we cover the end of the range? if not, add it
+            range_end = cur_range['start'] + cur_range['len'] - 1
+            if last_value_mapped is not None and last_value_mapped < range_end:
+                end_of_range = { 'start': last_value_mapped + 1, 'len': range_end - last_value_mapped }
+                mappings_for_range.append(end_of_range)
+
+            new_ranges += mappings_for_range
+        ranges = new_ranges
+
+    min_range_start = sorted(ranges, key=lambda x: x['start'])[0]['start']
+    if min_location is None or min_range_start < min_location:
+        min_location = min_range_start 
 
 print(min_location)
 print("--- %s seconds ---" % (time.time() - start_time))

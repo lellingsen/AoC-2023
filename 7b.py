@@ -14,7 +14,7 @@ card_strengths = {
     'A': 'a', 
     'K': 'b', 
     'Q': 'c', 
-    'J': 'd', 
+    'J': 'n', 
     'T': 'e', 
     '9': 'f', 
     '8': 'g', 
@@ -33,6 +33,12 @@ for line in input:
     card_counts = {}
     for card in hand:
         card_counts[card] = card_counts.get(card, 0) + 1
+
+    joker_count = card_counts.get('J', 0)
+    if joker_count > 0:
+        card_counts['J'] = 0
+        max_card = max(card_counts, key=card_counts.get) 
+        card_counts[max_card] += joker_count
 
     pair_count = sum(value == 2 for value in card_counts.values())
     hand_strength = 1

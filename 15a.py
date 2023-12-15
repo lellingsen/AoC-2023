@@ -19,7 +19,6 @@ sum = 0
 
 for step in steps:
     value = run_hash(step)
-    print(step, value)
     sum += value
 
 print(sum)
